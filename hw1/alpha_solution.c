@@ -429,11 +429,121 @@ void treeint_dump()
     __treeint_dump(st_root(tree), 0);
 }
 
+
+// ---
+// rbtree ref
+#include <linux/rbtree.h>
+
+struct treeint_rb {
+    int value;
+    struct rb_node node;
+};
+
+struct rb_tree tree_rb;
+
+int treeint_rb_init()
+{
+	tree_rb = RB_ROOT;
+	assert(tree_rb);
+	return 0;
+}
+
+struct treeint_rb *treeint_rb_insert(int a)
+{
+  struct rb_node **new = &tree_rb->rb_node, *parent = NULL;
+  while (*new) {
+	struct treeint_rb *t = container_of(*new, struct treeint_rb, node);
+	if(a == t->value)
+		return t;
+
+	parent = *new;
+	if(a > t->value)
+		new = &(*new)->rb_left;
+	else if(a < t->value)
+		new = &(*new)->rb_right;
+  }
+  struct treeint_rb *node = calloc(sizeof(treeint_rb), 1);
+  rb_link_node(&node->node, parent, new);
+  rb_insert_color(&node->node, tree_rb);
+  return node;
+}
+
+struct treeint_rb *treeint_rb_find(int a)
+{
+	struct rb_node *node = tree_rb->node;
+
+    while (node) {
+        struct treeint_rb *data = container_of(node, struct treeint_rb, node);
+
+        if (a > data->value)
+            node = node->rb_left;
+        else if (a < data->value)
+            node = node->rb_right;
+        else
+            return data;
+    }
+    return NULL;
+}
+
+int treeint_rb_remove(int a)
+{
+	struct treeint_rb *n = treeint_rb_find(a);
+	if(!n)
+		return -1;
+
+	rb_erase(&n->node, tree_rb);
+	free(n);
+	return 0;
+}
+
+static void __treeint_rb_destroy(struct rb_node *n) {
+	if(n->left)
+		__treeint_rb_destroy(n->left);
+	if(n->right)
+		__treeint_rb_destroy(n->right);
+
+	struct treeint_rb *i = container_of(n, struct treeint_rb, rb_node);
+	free(i);
+}
+
+int treeint_rb_destroy()
+{
+	assert(tree_rb);
+	if(tree_rb)
+		_treeint_rb_destroy(&tree_rb);
+
+	free(tree_rb);
+	return 0;
+}
+
 int main()
 {
     srand(time(0));
 
-    treeint_init();
+	treeint_init();
+	treeint_rb_init();
+
+    for (int i = 0; i < 100; ++i) {
+		int tmp = rand() % 99;
+        treeint_insert(tmp);
+		treeint_rb_insert(tmp);
+	}
+
+    printf("Removing...\n");
+    for (int i = 0; i < 100; ++i) {
+        int v = rand() % 99;
+        printf("%2d  ", v);
+        if ((i + 1) % 10 == 0)
+            printf("\n");
+        treeint_remove(v);
+		treeint_rb_remove(v);
+    }
+    printf("\n");
+
+    treeint_destroy();
+	treeint_rb_destroy();
+
+    /*treeint_init();
 
     for (int i = 0; i < 100; ++i)
         treeint_insert(rand() % 99);
@@ -454,7 +564,8 @@ int main()
     printf("[ After removals ]\n");
     treeint_dump();
 
-    treeint_destroy();
+    treeint_destroy();*/
+
 
     return 0;
 }
