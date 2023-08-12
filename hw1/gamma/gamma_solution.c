@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #define HHHH pthread_cond_wait(&qs->cond_st, &qs->mtx_st)
 #define JJJJ pthread_cond_signal(&qs2->cond_st)
@@ -18,6 +19,10 @@
             exit(1);                                                   \
         }                                                              \
     } while (0)
+
+extern void seed(uint64_t, uint64_t);
+extern void jump(void);
+extern uint64_t next(void);
 
 typedef int cmp_t(const void *, const void *);
 static inline char *med3(char *, char *, char *, cmp_t *, void *);
@@ -374,7 +379,6 @@ again:
 }
 
 #include <err.h>
-#include <stdint.h>
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -481,6 +485,8 @@ int main(int argc, char *argv[])
     argc -= optind;
     argv += optind;
 
+    seed(314159265, 1618033989);  // Initialize PRNG with pi and phi.
+
     if (opt_str) {
         str_elem = xmalloc(nelem * sizeof(char *));
         for (i = 0; i < nelem; i++)
@@ -490,8 +496,11 @@ int main(int argc, char *argv[])
             }
     } else {
         int_elem = xmalloc(nelem * sizeof(ELEM_T));
-        for (i = 0; i < nelem; i++)
-            int_elem[i] = rand() % nelem;
+        for (i = 0; i < nelem; i++) {
+            uint64_t val = next();
+            uint64_t tmp = val & 0xFFFFFFFF;
+            int_elem[i] = tmp;
+        }
     }
     if (opt_str) {
         if (opt_libc)
