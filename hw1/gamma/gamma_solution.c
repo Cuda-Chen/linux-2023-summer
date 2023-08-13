@@ -313,6 +313,26 @@ top:
             }
 #endif
 #if 1
+        /* bubble sort */
+    for(pm = (char*)a + n * es; pm > (char *)a + es; pm -= es) {
+        char max[es];
+        memcpy(max, a, es);
+        for(pl = (char*)a + es; pl < pm; pl += es) {
+            char y[es];
+            memcpy(y, pl, es);
+            if(CMP(thunk, max, y) <= 0)
+                memcpy(pl - es, max, es);
+            else
+                memcpy(pl - es, y, es);
+            if(CMP(thunk, max, y) <= 0)
+                memcpy(max, y, es);
+            else
+                memcpy(max, max, es);
+        }
+        memcpy(pm - es, max, es);
+    }
+#endif
+#if 0
         /* optimized bubble sort */
         for(pm = (char *) a + n * es; pm > (char *) a + es; pm -= (2 * es)) {
            char *x = (char *)a;
