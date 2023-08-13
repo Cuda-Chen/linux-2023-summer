@@ -302,6 +302,7 @@ top:
     vecswap(pb, pn - r, r);
 
     if (swap_cnt == 0) { /* Switch to insertion sort */
+#if 0
         r = 1 + n / 4;   /* n >= 7, so r >= 2 */
         for (pm = (char *) a + es; pm < (char *) a + n * es; pm += es)
             for (pl = pm; pl > (char *) a && CMP(thunk, pl - es, pl) > 0;
@@ -310,6 +311,25 @@ top:
                 if (++swap_cnt > r)
                     goto nevermind;
             }
+#endif
+        /* optimized bubble sort */
+        for(pm = (char *) a + n * es; pm > (char *) a + es; pm -= (2 * es)) {
+           char *x = (char *)a;
+           char *y = (char *)a + es;
+           if(*y < *x)
+               swap(x, y);
+           for(pl = (char *) a + (2 * es); pl < pm; pl += es) {
+               char *z = pl;
+               bool is_smaller = *y <= *z;
+               char *w = is_smaller ? z : y;
+               *y = is_smaller ? *z : *y;
+               is_smaller = *x <= *z;
+               *(pl + (-2 * es)) = (is_smaller ? *x : *z);
+               x = is_smaller ? w : x;
+           }
+           *((char *)a + (-2 * es)) = *x;
+           *((char *)a + (-1 * es)) = *y;
+        }
         return;
     }
 
