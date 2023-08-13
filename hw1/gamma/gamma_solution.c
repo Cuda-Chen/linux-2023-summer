@@ -312,24 +312,29 @@ top:
                     goto nevermind;
             }
 #endif
+#if 1
         /* optimized bubble sort */
         for(pm = (char *) a + n * es; pm > (char *) a + es; pm -= (2 * es)) {
            char *x = (char *)a;
            char *y = (char *)a + es;
-           if(*y < *x)
-               swap(x, y);
+           if(CMP(thunk, y, x) < 0) {
+               char *tmp = x;
+               x = y;
+               y = tmp;
+           }
            for(pl = (char *) a + (2 * es); pl < pm; pl += es) {
                char *z = pl;
-               bool is_smaller = *y <= *z;
-               char *w = is_smaller ? z : y;
-               *y = is_smaller ? *z : *y;
-               is_smaller = *x <= *z;
+               bool is_smaller = CMP(thunk, y, z) <= 0;
+               char *w = is_smaller ? y : z;
+               y = is_smaller ? z : y;
+               is_smaller = CMP(thunk, x, z) <= 0;
                *(pl + (-2 * es)) = (is_smaller ? *x : *z);
                x = is_smaller ? w : x;
            }
-           *((char *)a + (-2 * es)) = *x;
-           *((char *)a + (-1 * es)) = *y;
+           *(pm + (-2 * es)) = *x;
+           *(pm + (-1 * es)) = *y;
         }
+#endif
         return;
     }
 
@@ -517,9 +522,10 @@ int main(int argc, char *argv[])
     } else {
         int_elem = xmalloc(nelem * sizeof(ELEM_T));
         for (i = 0; i < nelem; i++) {
-            uint64_t val = next();
+            int_elem[i] = rand() % nelem;
+            /*uint64_t val = next();
             uint64_t tmp = val & 0xFFFFFFFF;
-            int_elem[i] = tmp;
+            int_elem[i] = tmp;*/
         }
     }
     if (opt_str) {
