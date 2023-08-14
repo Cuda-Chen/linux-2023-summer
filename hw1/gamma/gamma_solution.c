@@ -312,7 +312,7 @@ top:
                     goto nevermind;
             }
 #endif
-#if 1
+#if 0
         /* bubble sort */
     for(pm = (char*)a + n * es; pm > (char *)a + es; pm -= es) {
         char max[es];
@@ -332,27 +332,42 @@ top:
         memcpy(pm - es, max, es);
     }
 #endif
-#if 0
+#if 1
         /* optimized bubble sort */
         for(pm = (char *) a + n * es; pm > (char *) a + es; pm -= (2 * es)) {
-           char *x = (char *)a;
-           char *y = (char *)a + es;
+           char x[es], y[es];
+           memcpy(x, a, es);
+           memcpy(y, a + es, es);
            if(CMP(thunk, y, x) < 0) {
-               char *tmp = x;
-               x = y;
-               y = tmp;
+               char tmp[es];
+               memcpy(tmp, x, es);
+               memcpy(x, y, es);
+               memcpy(y, tmp, es);
            }
            for(pl = (char *) a + (2 * es); pl < pm; pl += es) {
-               char *z = pl;
+               char z[es];
+               memcpy(z, pl, es);
                bool is_smaller = CMP(thunk, y, z) <= 0;
-               char *w = is_smaller ? y : z;
-               y = is_smaller ? z : y;
+               char w[es];
+               if(is_smaller)
+                   memcpy(w, y, es);
+               else
+                   memcpy(w, z, es);
+
+               if(is_smaller)
+                   memcpy(y, z, es);
                is_smaller = CMP(thunk, x, z) <= 0;
-               *(pl + (-2 * es)) = (is_smaller ? *x : *z);
-               x = is_smaller ? w : x;
+
+               if(is_smaller)
+                   memcpy(pl + (-2 * es), x, es);
+               else
+                    memcpy(pl + (-2 * es), z, es);
+
+               if(is_smaller)
+                   memcpy(x, w, es);
            }
-           *(pm + (-2 * es)) = *x;
-           *(pm + (-1 * es)) = *y;
+           memcpy(pm + (-2 * es), x, es);
+           memcpy(pm + (-1 * es), y, es);
         }
 #endif
         return;
