@@ -1,36 +1,30 @@
-CFLAGS := -I.. -std=c11 -Wall -g -O2 -D_GNU_SOURCE -fsanitize=thread
-LDFLAGS := -lpthread
+CFLAGS = -O2 -std=c11 -Wall -Wextra -I.. -MMD -DUSE_LINUX -D_GNU_SOURCE
+CC = gcc
+LDFLAGS = -lpthread -fsanitize=thread -fPIE -pie
 
-ALL := pi-test
+OUT ?= build
+BINARY = $(OUT)/priority-inversion
 
-all: $(ALL)
-.PHONY: all
+SHELL_HACK := $(shell mkdir -p $(OUT))
 
-test_%: main.c
-	$(CC) $(CFLAGS) main.c -o $@ $(LDFLAGS)
+CSRCS = $(shell find . -name '*.c')
+_COBJ =  $(notdir $(CSRCS))
+COBJS = $(_COBJ:%.c=$(OUT)/%.o)
 
-test_pthread: CFLAGS += -DUSE_PTHREADS
-test_linux: CFLAGS += -DUSE_LINUX
+all: $(BINARY)
 
-# Test suite
-NAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Darwin)
-    PRINTF = printf
-else
-    PRINTF = env printf
-endif
-PASS_COLOR = \e[32;01m
-NO_COLOR = \e[0m
-notice = $(PRINTF) "$(PASS_COLOR)$(strip $1)$(NO_COLOR)\n"
-
-check: $(ALL)
-	@$(foreach t,$^,\
-	    $(PRINTF) "Running $(t) ... "; \
-	    ./$(t) && $(call notice, [OK]); \
-	)
-
+# This should be run as root because we'll modify the schedule policy
+run: $(BINARY)
+	sudo taskset -c 1 $(BINARY)
 clean:
-	$(RM) $(ALL)
-.PHONY: clean
+	$(RM) $(COBJS)
+	$(RM) $(BINARY)
+	$(RM) $(OUT)/*.d
+
+$(BINARY): $(COBJS)
+	@$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+$(OUT)/%.o: %.c
+	@$(CC) -c $(CFLAGS) $< -o $@
 
 -include $(OUT)/*.d

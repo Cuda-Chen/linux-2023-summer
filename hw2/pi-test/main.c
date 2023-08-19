@@ -1,134 +1,68 @@
-#include <pthread.h>
-#include <stdbool.h>
+/* originated from here: https://github.com/qwe661234/MuThreadPackage/blob/main/Tests/test-04-priority-inversion.c */
+
+#include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <pthread.h>
 
-#include "cond.h"
-#include "futex.h"
 #include "mutex.h"
+#include "futex.h"
 
-struct clock {
-    mutex_t mutex;
-    cond_t cond;
-    int ticks;
-};
+#define THREADCNT 3
 
-static void clock_init(struct clock *clock)
+mutex_t mtx1, mtx2;
+
+void *TASK1(void *arg)
 {
-    mutex_init(&clock->mutex);
-    cond_init(&clock->cond);
-    clock->ticks = 0;
+    mutex_lock(&mtx1);
+    printf("1\n");
+    mutex_unlock(&mtx1);
+	return NULL;
 }
 
-static bool clock_wait(struct clock *clock, int ticks)
-{
-    mutex_lock(&clock->mutex);
-    while (clock->ticks >= 0 && clock->ticks < ticks)
-        cond_wait(&clock->cond, &clock->mutex);
-    bool ret = clock->ticks >= ticks;
-    mutex_unlock(&clock->mutex);
-    return ret;
+void *TASK2(void *arg)
+{ 
+    mutex_lock(&mtx2);
+    sleep(1);
+    printf("2\n");
+    mutex_unlock(&mtx2);
+	return NULL;
 }
 
-static void clock_tick(struct clock *clock)
-{
-    mutex_lock(&clock->mutex);
-    if (clock->ticks >= 0)
-        ++clock->ticks;
-    mutex_unlock(&clock->mutex);
-    cond_broadcast(&clock->cond, &clock->mutex);
-}
-
-static void clock_stop(struct clock *clock)
-{
-    mutex_lock(&clock->mutex);
-    clock->ticks = -1;
-    mutex_unlock(&clock->mutex);
-    cond_broadcast(&clock->cond, &clock->mutex);
-}
-
-/* A node in a computation graph */
-struct node {
-    struct clock *clock;
-    struct node *parent;
-    mutex_t mutex;
-    cond_t cond;
-    bool ready;
-};
-
-static void node_init(struct clock *clock,
-                      struct node *parent,
-                      struct node *node)
-{
-    node->clock = clock;
-    node->parent = parent;
-    mutex_init(&node->mutex);
-    cond_init(&node->cond);
-    node->ready = false;
-}
-
-static void node_wait(struct node *node)
-{
-    mutex_lock(&node->mutex);
-    while (!node->ready)
-        cond_wait(&node->cond, &node->mutex);
-    node->ready = false;
-    mutex_unlock(&node->mutex);
-}
-
-static void node_signal(struct node *node)
-{
-    mutex_lock(&node->mutex);
-    node->ready = true;
-    mutex_unlock(&node->mutex);
-    cond_signal(&node->cond, &node->mutex);
-}
-
-static void *thread_func(void *ptr)
-{
-    struct node *self = ptr;
-    bool bit = false;
-
-    for (int i = 1; clock_wait(self->clock, i); ++i) {
-        if (self->parent)
-            node_wait(self->parent);
-
-        if (bit) {
-            node_signal(self);
-        } else {
-            clock_tick(self->clock);
-        }
-        bit = !bit;
-    }
-
-    node_signal(self);
+void *TASK3(void *arg)
+{   
+    mutex_lock(&mtx1);
+    sleep(1);
+    printf("3\n");
+    mutex_unlock(&mtx1);
     return NULL;
 }
 
-int main(void)
-{
-    struct clock clock;
-    clock_init(&clock);
+int main() {
+    pthread_t th[THREADCNT];
+    pthread_attr_t attr;
 
-#define N_NODES 16
-    struct node nodes[N_NODES];
-    node_init(&clock, NULL, &nodes[0]);
-    for (int i = 1; i < N_NODES; ++i)
-        node_init(&clock, &nodes[i - 1], &nodes[i]);
+    struct sched_param param;
+    mutex_init(&mtx1);
+    mutex_init(&mtx2);
 
-    pthread_t threads[N_NODES];
-    for (int i = 0; i < N_NODES; ++i) {
-        if (pthread_create(&threads[i], NULL, thread_func, &nodes[i]) != 0)
-            return EXIT_FAILURE;
-    }
+    pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
+    pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
 
-    clock_tick(&clock);
-    clock_wait(&clock, 1 << N_NODES);
-    clock_stop(&clock);
+	param.sched_priority = (THREADCNT - 2) * 10;
+    pthread_attr_setschedparam(&attr, &param);
+    pthread_create(&th[2], NULL, TASK3, (void *)NULL);
 
-    for (int i = 0; i < N_NODES; ++i) {
-        if (pthread_join(threads[i], NULL) != 0)
-            return EXIT_FAILURE;
-    }
+    param.sched_priority = (THREADCNT - 1) * 10;
+    pthread_attr_setschedparam(&attr, &param);
+    pthread_create(&th[1], NULL, TASK2, (void *)NULL);
 
-    return EXIT_SUCCESS;
+    param.sched_priority = (THREADCNT) * 10;
+    pthread_attr_setschedparam(&attr, &param);
+    pthread_create(&th[0], NULL, TASK1, (void *)NULL);
+
+    void *result;
+	for(int i = 0; i < THREADCNT; i++)
+		pthread_join(th[i], &result);
+    return 0;
 }
