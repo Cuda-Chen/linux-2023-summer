@@ -26,4 +26,14 @@ static inline void futex_requeue(atomic int *futex,
 {
     syscall(SYS_futex, futex, FUTEX_REQUEUE_PRIVATE, limit, INT_MAX, other);
 }
+
+static inline void futex_lock_pi(atomic int *futex, struct timespec *timeout)
+{
+    syscall(SYS_futex, futex, FUTEX_LOCK_PI2_PRIVATE, 0, timeout);
+}
+
+static inline void futex_unlock_pi(atomic int *futex)
+{
+    syscall(SYS_futex, futex, FUTEX_UNLOCK_PI_PRIVATE);
+}
 #endif

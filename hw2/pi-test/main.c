@@ -6,13 +6,14 @@
 #include <pthread.h>
 
 #include "mutex.h"
-#include "futex.h"
+#include "atomic.h"
 
 #define THREADCNT 3
 
+atomic bool thread_stop = false;
 mutex_t mtx1, mtx2;
 
-void *TASK1(void *arg)
+void *task1(void *arg)
 {
     mutex_lock(&mtx1);
     printf("1\n");
@@ -20,7 +21,7 @@ void *TASK1(void *arg)
 	return NULL;
 }
 
-void *TASK2(void *arg)
+void *task2(void *arg)
 { 
     mutex_lock(&mtx2);
     sleep(1);
@@ -29,7 +30,7 @@ void *TASK2(void *arg)
 	return NULL;
 }
 
-void *TASK3(void *arg)
+void *task3(void *arg)
 {   
     mutex_lock(&mtx1);
     sleep(1);
@@ -40,29 +41,32 @@ void *TASK3(void *arg)
 
 int main() {
     pthread_t th[THREADCNT];
+
+    mutexattr_t mattr;
+    mutexattr_setprotocol(&mattr, PRIO_INHERIT);
+    mutex_init(&mtx1, &mattr);
+    mutex_init(&mtx2, &mattr);
+
     pthread_attr_t attr;
-
-    struct sched_param param;
-    mutex_init(&mtx1);
-    mutex_init(&mtx2);
-
     pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
     pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
 
+    struct sched_param param;
+
 	param.sched_priority = (THREADCNT - 2) * 10;
     pthread_attr_setschedparam(&attr, &param);
-    pthread_create(&th[2], NULL, TASK3, (void *)NULL);
+    pthread_create(&th[2], NULL, task3, (void *)NULL);
 
     param.sched_priority = (THREADCNT - 1) * 10;
     pthread_attr_setschedparam(&attr, &param);
-    pthread_create(&th[1], NULL, TASK2, (void *)NULL);
+    pthread_create(&th[1], NULL, task2, (void *)NULL);
 
     param.sched_priority = (THREADCNT) * 10;
     pthread_attr_setschedparam(&attr, &param);
-    pthread_create(&th[0], NULL, TASK1, (void *)NULL);
+    pthread_create(&th[0], NULL, task1, (void *)NULL);
 
-    void *result;
-	for(int i = 0; i < THREADCNT; i++)
-		pthread_join(th[i], &result);
+	for(int i = THREADCNT - 1; i >= 0; i--)
+		pthread_join(th[i], NULL);
+    sleep(2);
     return 0;
 }
